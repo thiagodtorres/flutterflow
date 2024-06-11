@@ -1,0 +1,89 @@
+// Automatic FlutterFlow imports
+import '/backend/backend.dart';
+import '/flutter_flow/flutter_flow_theme.dart';
+import '/flutter_flow/flutter_flow_util.dart';
+import '/custom_code/actions/index.dart'; // Imports other custom actions
+import '/flutter_flow/custom_functions.dart'; // Imports custom functions
+import 'package:flutter/material.dart';
+// Begin custom action code
+// DO NOT REMOVE OR MODIFY THE CODE ABOVE!
+
+// Importações específicas para Firebase
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:convert';
+
+// Função assíncrona para criar um novo usuário
+Future<String> criarUsuario(
+  String nome,
+  String email,
+  String senha,
+  String doc,
+) async {
+  // Obtém o horário atual para usar como tempo de criação
+  DateTime createdTime = DateTime.now();
+
+  // Tenta reutilizar uma instância existente do FirebaseApp, se já existir
+  FirebaseApp? existingApp;
+  try {
+    existingApp = Firebase.app(doc);
+  } catch (e) {
+    existingApp = null;
+  }
+
+  // Cria uma nova instância do FirebaseApp se não houver uma existente
+  FirebaseApp app = existingApp ??
+      await Firebase.initializeApp(
+        name: doc,
+        options: Firebase.app().options,
+      );
+
+  try {
+    // Cria o usuário na aba de autenticação do Firebase com email e senha
+    UserCredential userCredential = await FirebaseAuth.instanceFor(app: app)
+        .createUserWithEmailAndPassword(email: email, password: senha);
+
+    // Obtém o ID único (UID) do usuário criado
+    String? uid = userCredential.user?.uid;
+
+    if (uid != null) {
+      // Referência à coleção 'users' no Firestore
+      final CollectionReference<Map<String, dynamic>> usersRef =
+          FirebaseFirestore.instance.collection('users');
+
+      // Define os campos do documento do usuário
+      Map<String, dynamic> userFields = {
+        'uid': uid,
+        'email': email,
+        'created_time': createdTime,
+        'display_name': nome,
+        'senha': senha,
+      };
+
+      // Cria o documento do usuário na coleção 'users' no Firestore
+      await usersRef.doc(uid).set(userFields);
+
+      return 'Usuário criado com sucesso.';
+    } else {
+      return 'Erro ao criar o usuário, UID não gerado.';
+    }
+  } on FirebaseAuthException catch (e) {
+    // Captura e trata exceções específicas de autenticação do Firebase
+    String errorMessage =
+        'Erro ao criar usuário: ${e.code}. Detalhes: ${e.message}';
+    if (e.code == 'network-request-failed') {
+      errorMessage += ' Não foi possível estabelecer conexão com o firebase';
+    } else if (e.code == 'email-already-in-use') {
+      errorMessage +=
+          ' O endereço de e-mail já está em uso. Por favor, use um e-mail diferente.';
+    } else if (e.code == 'weak-password') {
+      errorMessage +=
+          ' A senha fornecida é muito fraca. Por favor, forneça uma senha mais forte.';
+    }
+    return errorMessage;
+  } catch (e) {
+    // Captura e trata qualquer outra exceção desconhecida
+    return 'Erro desconhecido: ${e.toString()}';
+  }
+}
