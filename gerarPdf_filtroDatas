@@ -1,0 +1,82 @@
+// Automatic FlutterFlow imports
+import '/backend/backend.dart';
+import '/backend/schema/structs/index.dart';
+import '/flutter_flow/flutter_flow_theme.dart';
+import '/flutter_flow/flutter_flow_util.dart';
+import '/custom_code/actions/index.dart'; // Imports other custom actions
+import '/flutter_flow/custom_functions.dart'; // Imports custom functions
+import 'package:flutter/material.dart';
+// Begin custom action code
+// DO NOT REMOVE OR MODIFY THE CODE ABOVE!
+
+// Importa a biblioteca `pdf` para criar e manipular documentos PDF.
+import 'package:pdf/widgets.dart' as pw;
+
+// Importa definições básicas e estruturas para trabalhar com documentos PDF.
+import 'package:pdf/pdf.dart';
+
+// Importa a biblioteca `printing` para permitir a impressão direta de documentos em Flutter.
+import 'package:printing/printing.dart';
+
+// Importa a biblioteca `intl` para formatação de datas e outras formatações localizadas.
+import 'package:intl/intl.dart';
+
+Future<void> gerarPdf(
+  DateTime? dataInicial,
+  DateTime? dataFinal,
+  List<DatasRecord> colecao,
+) async {
+  final pdf = pw.Document();
+  final dateFormat = DateFormat('dd/MM/yyyy', 'pt-BR');
+
+  // Ajusta a data final para incluir o dia completo
+  final dataFinalAjustada = dataFinal != null
+      ? DateTime(dataFinal.year, dataFinal.month, dataFinal.day, 23, 59, 59)
+      : null;
+
+  // Filtra a coleção de acordo com os parâmetros fornecidos
+  List<DatasRecord> registrosFiltrados = colecao.where((datas) {
+    if (dataInicial != null && dataFinalAjustada != null) {
+      return datas.dataEntrada!.isAfter(dataInicial) &&
+          datas.dataEntrada!.isBefore(dataFinalAjustada);
+    } else if (dataInicial != null) {
+      return datas.dataEntrada!.isAfter(dataInicial);
+    } else if (dataFinalAjustada != null) {
+      return datas.dataEntrada!.isBefore(dataFinalAjustada);
+    }
+    return true; // Retorna todos os registros se nenhum filtro for aplicado
+  }).toList();
+
+  // Adiciona uma página ao PDF com o relatório de entradas
+  pdf.addPage(pw.MultiPage(
+    build: (context) => [
+      // Cabeçalho do relatório
+      pw.Header(
+        level: 0,
+        child: pw.Text(
+          'Relatório de Entradas',
+          style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+        ),
+      ),
+      // Tabela com os dados do relatório
+      pw.TableHelper.fromTextArray(
+        context: context,
+        data: <List<String>>[
+          <String>['Título', 'Data', 'Horario'], // Cabeçalho da tabela
+          // Mapeia os dados do relatório para uma lista de listas de strings
+          ...registrosFiltrados.map(
+            (datas) => [
+              datas.titulo,
+              dateFormat.format(datas.dataEntrada ?? DateTime.now()),
+            ],
+          ),
+        ],
+      ),
+    ],
+  ));
+
+  // Imprime o PDF
+  await Printing.layoutPdf(
+    onLayout: (PdfPageFormat format) async => pdf.save(),
+  );
+}
